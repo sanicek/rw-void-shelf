@@ -76,3 +76,4 @@ payload packaged and checksum-protected.
 - `1.6/` — active 1.6 Defs; its DLL is generated only in packages
 - `Source/VoidShelf/` — Visual Studio solution, project, and C# source
 - `scripts/` — build, package validation, and local-install helpers
+- `WORKSHOP_DESCRIPTION.md` — paste-ready Steam Workshop description in BBCode
