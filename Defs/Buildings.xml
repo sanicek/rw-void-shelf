@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+
+	<ThingDef ParentName="ShelfBase">
+		<defName>VoidShelf</defName>
+		<label>Void Shelf</label>
+		<description>A mysterious void shelf that annihilates anything placed upon it.</description>
+		<graphicData>
+			<texPath>Things/Building/Furniture/Shelf</texPath>
+			<graphicClass>Graphic_Multi</graphicClass>
+			<drawSize>(3,2)</drawSize>
+		</graphicData>
+		<costStuffCount>100</costStuffCount>
+		<statBases>
+			<MaxHitPoints>100</MaxHitPoints>
+			<Mass>8</Mass>
+			<WorkToBuild>1000</WorkToBuild>
+			<StyleDominance MayRequire="Ludeon.RimWorld.Ideology">5</StyleDominance>
+		</statBases>
+		<size>(2,1)</size>
+		<designationHotKey>Misc12</designationHotKey>
+		<tickerType>Rare</tickerType>
+		<thingClass>Building_Storage</thingClass>
+		<comps>
+			<li Class="VoidShelf.CompProperties_DestroyerShelf"/>
+		</comps>
+		<building>
+			<relatedBuildCommands>
+				<li>ShelfSmall</li>
+				<li>Shelf</li>
+			</relatedBuildCommands>
+			<defaultStorageSettings>
+				<priority>Low</priority>
+				<filter>
+					<categories>
+					</categories>
+				</filter>
+			</defaultStorageSettings>
+		</building>
+	</ThingDef>
+</Defs>
