@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
-	<ThingDef ParentName="ShelfBase">
+	<ThingDef ParentName="StorageShelfBase">
 		<defName>VoidShelf</defName>
 		<label>Void Shelf</label>
 		<description>A mysterious void shelf that annihilates anything placed upon it.</description>
@@ -20,7 +20,6 @@
 		<size>(2,1)</size>
 		<designationHotKey>Misc12</designationHotKey>
 		<tickerType>Rare</tickerType>
-		<thingClass>Building_Storage</thingClass>
 		<comps>
 			<li Class="VoidShelf.CompProperties_DestroyerShelf"/>
 		</comps>
@@ -32,8 +31,7 @@
 			<defaultStorageSettings>
 				<priority>Low</priority>
 				<filter>
-					<categories>
-					</categories>
+					<categories Inherit="False" />
 				</filter>
 			</defaultStorageSettings>
 		</building>

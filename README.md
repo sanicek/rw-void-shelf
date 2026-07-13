@@ -7,7 +7,7 @@ on it. Use its storage settings carefully: anything stored on the shelf is lost.
 
 This repository contains the shipped source recovered from Workshop item
 [3008773339](https://steamcommunity.com/sharedfiles/filedetails/?id=3008773339).
-It currently targets RimWorld 1.5.
+It currently targets RimWorld 1.6.
 
 ## Build and local install
 
@@ -43,8 +43,8 @@ Assemblies/VoidShelf.dll
 
 The build validates the package structure and XML. When a RimWorld installation
 is supplied, validation warns if its version is not listed in `About/About.xml`.
-The current metadata targets RimWorld 1.5, so an installed 1.6 game produces an
-expected compatibility warning; this does not claim 1.6 compatibility.
+The current metadata targets RimWorld 1.6, matching the locally validated game
+version.
 
 ### Manual smoke test
 
