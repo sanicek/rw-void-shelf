@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-"""Validate a runtime-only RimWorld mod package."""
+"""Validate a versioned runtime-only RimWorld mod package."""
 
 import argparse
+import hashlib
 import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
-EXPECTED_TOP_LEVEL = {"About", "Defs", "Assemblies"}
+EXPECTED_TOP_LEVEL = {"About", "LoadFolders.xml", "1.5", "1.6"}
+EXPECTED_VERSIONS = ("1.5", "1.6")
 FORBIDDEN_NAMES = {"Source", ".git", "scripts", "bin", "obj", ".vs"}
 PACKAGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+FROZEN_PAYLOAD_HASHES = {
+    "1.5": {
+        "defs": "cbf0d16d5bc11a5f0fb2351b994d0cb7c68bfa8738aa3f85b4a2a49270c6baca",
+        "dll": "67b0c3c907b46e05913be541dd04cee488fc8c7ddbb6ed5877d92c01e71b6f20",
+    },
+}
 
 
 def fail(message: str) -> None:
@@ -21,6 +29,11 @@ def fail(message: str) -> None:
 def require_file(path: Path) -> None:
     if not path.is_file() or path.stat().st_size == 0:
         fail(f"required non-empty file is missing: {path}")
+
+
+def require_directory(path: Path) -> None:
+    if not path.is_dir() or path.is_symlink():
+        fail(f"required package directory is missing or not a real directory: {path}")
 
 
 def parse_xml_files(directory: Path) -> None:
@@ -43,6 +56,49 @@ def installed_version(rimworld_dir: Path) -> Optional[str]:
     return match.group(0)
 
 
+def load_folder_mapping(path: Path) -> Dict[str, str]:
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as error:
+        fail(f"invalid XML in {path}: {error}")
+    if root.tag != "loadFolders" or root.attrib or (root.text and root.text.strip()):
+        fail("LoadFolders.xml root must be loadFolders")
+    entries = list(root)
+    if {entry.tag for entry in entries} != {"v1.5", "v1.6"} or len(entries) != 2:
+        fail("LoadFolders.xml must contain exactly v1.5 and v1.6 mappings")
+    mapping = {}
+    for entry in entries:
+        if entry.attrib or (entry.text and entry.text.strip()) or (entry.tail and entry.tail.strip()) or len(entry) != 1:
+            fail(f"invalid LoadFolders.xml mapping for {entry.tag}")
+        item = entry[0]
+        if item.tag != "li" or item.attrib or len(item) != 0 or item.text is None or (item.tail and item.tail.strip()):
+            fail(f"invalid LoadFolders.xml mapping for {entry.tag}")
+        mapping[entry.tag] = item.text.strip()
+    if mapping != {"v1.5": "1.5", "v1.6": "1.6"}:
+        fail("LoadFolders.xml mappings must select matching 1.5 and 1.6 folders")
+    return mapping
+
+
+def validate_version(package: Path, version: str) -> None:
+    version_dir = package / version
+    require_directory(version_dir)
+    if {path.name for path in version_dir.iterdir()} != {"Defs", "Assemblies"}:
+        fail(f"unexpected runtime content in {version_dir}")
+    defs = version_dir / "Defs"
+    assemblies = version_dir / "Assemblies"
+    require_directory(defs)
+    require_directory(assemblies)
+    if {path.name for path in assemblies.iterdir()} != {"VoidShelf.dll"}:
+        fail(f"unexpected runtime content in {assemblies}")
+    require_file(assemblies / "VoidShelf.dll")
+    def_files = sorted(defs.rglob("*.xml"))
+    if not def_files:
+        fail(f"no Defs XML files found under {defs}")
+    if any(path.stat().st_size == 0 for path in def_files):
+        fail(f"empty Defs XML file found under {defs}")
+    parse_xml_files(defs)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package", type=Path)
@@ -54,10 +110,8 @@ def main() -> None:
     package = args.package.resolve()
     if not package.is_dir():
         fail(f"package directory does not exist: {package}")
-
-    unexpected = [path.name for path in package.iterdir() if path.name not in EXPECTED_TOP_LEVEL]
-    if unexpected:
-        fail(f"unexpected top-level package entries: {', '.join(sorted(unexpected))}")
+    if {path.name for path in package.iterdir()} != EXPECTED_TOP_LEVEL:
+        fail("package must contain exactly About, LoadFolders.xml, 1.5, and 1.6")
     for path in package.rglob("*"):
         if path.is_symlink():
             fail(f"symlinks are not allowed in package: {path}")
@@ -65,20 +119,23 @@ def main() -> None:
             fail(f"generated or repository artifact is not allowed in package: {path}")
 
     about = package / "About"
-    defs = package / "Defs"
-    assemblies = package / "Assemblies"
-    for directory in (about, defs, assemblies):
-        if not directory.is_dir() or directory.is_symlink():
-            fail(f"required package directory is missing or not a real directory: {directory}")
+    require_directory(about)
     require_file(about / "About.xml")
-    require_file(assemblies / "VoidShelf.dll")
-    def_files = sorted(defs.rglob("*.xml"))
-    if not def_files:
-        fail(f"no Defs XML files found under {defs}")
-    if any(path.stat().st_size == 0 for path in def_files):
-        fail("empty Defs XML file found")
+    load_folders = package / "LoadFolders.xml"
+    require_file(load_folders)
+    mapping = load_folder_mapping(load_folders)
     parse_xml_files(about)
-    parse_xml_files(defs)
+    for version in EXPECTED_VERSIONS:
+        validate_version(package, version)
+
+    for version, hashes in FROZEN_PAYLOAD_HASHES.items():
+        frozen_defs = package / version / "Defs" / "Buildings.xml"
+        frozen_dll = package / version / "Assemblies" / "VoidShelf.dll"
+        require_file(frozen_defs)
+        if hashlib.sha256(frozen_defs.read_bytes()).hexdigest() != hashes["defs"]:
+            fail(f"frozen {version} Buildings.xml hash mismatch")
+        if hashlib.sha256(frozen_dll.read_bytes()).hexdigest() != hashes["dll"]:
+            fail(f"frozen {version} VoidShelf.dll hash mismatch")
 
     metadata = ET.parse(about / "About.xml").getroot()
     name = metadata.findtext("name", default="").strip()
@@ -88,8 +145,8 @@ def main() -> None:
         fail("About/About.xml has an empty name")
     if not PACKAGE_ID.fullmatch(package_id):
         fail(f"About/About.xml has an invalid packageId: {package_id!r}")
-    if not versions:
-        fail("About/About.xml must list at least one supportedVersion")
+    if versions != [mapping["v1.5"], mapping["v1.6"]]:
+        fail("About supportedVersions must exactly match LoadFolders.xml versions")
 
     if args.rimworld_dir:
         version = installed_version(args.rimworld_dir)
