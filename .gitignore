@@ -9,3 +9,6 @@
 [Bb]in/
 [Oo]bj/
 /Assemblies/
+/artifacts/
+__pycache__/
+*.py[cod]
