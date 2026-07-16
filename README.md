@@ -77,3 +77,18 @@ payload packaged and checksum-protected.
 - `Source/VoidShelf/` — Visual Studio solution, project, and C# source
 - `scripts/` — build, package validation, and local-install helpers
 - `WORKSHOP_DESCRIPTION.md` — paste-ready Steam Workshop description in BBCode
+
+## Maintenance style
+
+Maintained source follows the literate programming convention in `AGENTS.md`:
+files and nontrivial phases introduce their purpose, invariants, and tradeoffs
+before the implementation. Comments explain why a constraint exists rather than
+repeat what the syntax already says, and must change with the behavior they
+describe.
+
+Apply that convention to the active C#, scripts, build configuration, mod
+metadata, version routing, and 1.6 Defs. Simple declarative files need only the
+context required to maintain their contracts. Do not rewrite generated output,
+dependency lockfiles, solution files, binaries, artwork, publishing IDs, legal
+text, or the checksum-frozen 1.5 payload to add commentary; document their
+contracts in the maintained code that produces or validates them instead.

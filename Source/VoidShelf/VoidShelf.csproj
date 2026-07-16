@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- RimWorld targets the classic .NET Framework runtime. For a fixed toolchain
+       and inputs, deterministic output plus warning-clean builds makes changes
+       to the maintained DLL easier to review. -->
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>VoidShelf</AssemblyName>
@@ -9,6 +12,9 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
+  <!-- Reference assemblies make net472 buildable on non-Windows hosts. RimWorld
+       supplies Assembly-CSharp.dll at runtime, so it must never be copied into
+       the mod package. Locked restore prevents dependency drift. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="Assembly-CSharp">
@@ -17,6 +23,8 @@
     </Reference>
   </ItemGroup>
 
+  <!-- Fail before reference resolution produces an opaque compiler error. The
+       build script supplies this path from the validated RimWorld installation. -->
   <Target Name="ValidateRimWorldManagedDir" BeforeTargets="ResolveReferences;CoreCompile">
     <Error Condition="'$(RimWorldManagedDir)' == ''" Text="RimWorldManagedDir must be supplied and point to RimWorldLinux_Data/Managed." />
     <Error Condition="!Exists('$(RimWorldManagedDir)/Assembly-CSharp.dll')" Text="Assembly-CSharp.dll was not found in RimWorldManagedDir: $(RimWorldManagedDir)" />

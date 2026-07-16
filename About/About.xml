@@ -3,6 +3,9 @@
   <name>Void Shelf</name>
   <author>Sanicek</author>
   <packageId>Sanicek.VoidShelf</packageId>
+  <!-- These versions are both player-facing compatibility metadata and a
+       validated contract. Keep them ordered and synchronized with
+       LoadFolders.xml and validate-package.py. -->
   <supportedVersions>
     <li>1.5</li>
     <li>1.6</li>
@@ -20,6 +23,8 @@ MIT licensed. Parts of the code, documentation, and maintenance used AI-tool ass
 
 https://github.com/sanicek/rw-void-shelf
   </description>
+  <!-- Loading after the base game makes the dependency order explicit without
+       introducing any optional mod requirement. -->
   <loadAfter>
     <li>Ludeon.RimWorld</li>
   </loadAfter>

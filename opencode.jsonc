@@ -1,5 +1,7 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  // These references provide read-time game APIs, Defs, logs, and saves for
+  // development. They are external evidence, never inputs copied into packages.
   "references": {
     "rimworld": {
       "path": "~/.steam/steam/steamapps/common/RimWorld",
@@ -11,6 +13,8 @@
     }
   },
   "permission": {
+    // External access defaults to confirmation; only the two declared RimWorld
+    // trees are available without broadening access to the rest of the machine.
     "external_directory": {
       "*": "ask",
       "~/.steam/steam/steamapps/common/RimWorld/**": "allow",
