@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a versioned runtime-only RimWorld mod package."""
+"""Validate the structural contract of a versioned runtime-only mod package.
+
+The package is intentionally stricter than a general RimWorld mod: it contains
+only publishable metadata and version-selected runtime payloads, preserves older
+recovered payloads byte-for-byte, and keeps supported-version declarations in
+agreement. Validation proves package shape and integrity constraints, not the
+runtime semantics of the active assembly or Defs.
+"""
 
 import argparse
 import hashlib
@@ -9,6 +16,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Optional
 
+# These declarations define the package as an allowlist. Unexpected content is
+# rejected so source, build intermediates, and stale version directories cannot
+# accidentally ship.
 EXPECTED_TOP_LEVEL = {"About", "LoadFolders.xml", "1.5", "1.6"}
 EXPECTED_VERSIONS = ("1.5", "1.6")
 FORBIDDEN_NAMES = {"Source", ".git", "scripts", "bin", "obj", ".vs"}
@@ -32,6 +42,7 @@ def require_file(path: Path) -> None:
 
 
 def require_directory(path: Path) -> None:
+    """Require a directory whose contents cannot be redirected by a symlink."""
     if not path.is_dir() or path.is_symlink():
         fail(f"required package directory is missing or not a real directory: {path}")
 
@@ -45,6 +56,7 @@ def parse_xml_files(directory: Path) -> None:
 
 
 def installed_version(rimworld_dir: Path) -> Optional[str]:
+    """Read the local game version when available for advisory compatibility."""
     version_file = rimworld_dir / "Version.txt"
     if not version_file.is_file():
         print(f"Warning: RimWorld Version.txt not found: {version_file}", file=sys.stderr)
@@ -57,6 +69,7 @@ def installed_version(rimworld_dir: Path) -> Optional[str]:
 
 
 def load_folder_mapping(path: Path) -> Dict[str, str]:
+    """Read the exact game-series-to-runtime-directory mapping."""
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError as error:
@@ -64,6 +77,9 @@ def load_folder_mapping(path: Path) -> Dict[str, str]:
     if root.tag != "loadFolders" or root.attrib or (root.text and root.text.strip()):
         fail("LoadFolders.xml root must be loadFolders")
     entries = list(root)
+
+    # Exact entries prevent metadata from advertising one set of versions while
+    # RimWorld silently selects another set of payloads.
     if {entry.tag for entry in entries} != {"v1.5", "v1.6"} or len(entries) != 2:
         fail("LoadFolders.xml must contain exactly v1.5 and v1.6 mappings")
     mapping = {}
@@ -80,6 +96,7 @@ def load_folder_mapping(path: Path) -> Dict[str, str]:
 
 
 def validate_version(package: Path, version: str) -> None:
+    """Validate one version directory as Defs plus one runtime assembly."""
     version_dir = package / version
     require_directory(version_dir)
     if {path.name for path in version_dir.iterdir()} != {"Defs", "Assemblies"}:
@@ -100,11 +117,16 @@ def validate_version(package: Path, version: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    """Validate package shape, payload integrity, and synchronized metadata."""
+    # Keep the concise CLI description stable while the module narrative records
+    # the validator's more detailed boundaries for maintainers.
+    parser = argparse.ArgumentParser(description="Validate a versioned runtime-only RimWorld mod package.")
     parser.add_argument("package", type=Path)
     parser.add_argument("--rimworld-dir", type=Path)
     args = parser.parse_args()
 
+    # First establish a closed, symlink-free package boundary. Later checks can
+    # then read files without following content outside the package root.
     if args.package.is_symlink():
         fail(f"package root must not be a symlink: {args.package}")
     package = args.package.resolve()
@@ -118,6 +140,8 @@ def main() -> None:
         if path.name in FORBIDDEN_NAMES:
             fail(f"generated or repository artifact is not allowed in package: {path}")
 
+    # Validate each structural layer from shared metadata down to per-version
+    # payloads. The mapping is retained for the metadata consistency check.
     about = package / "About"
     require_directory(about)
     require_file(about / "About.xml")
@@ -128,6 +152,8 @@ def main() -> None:
     for version in EXPECTED_VERSIONS:
         validate_version(package, version)
 
+    # Older recovered payloads are historical artifacts, not rebuild products.
+    # Hashing both Defs and DLLs makes accidental edits fail packaging.
     for version, hashes in FROZEN_PAYLOAD_HASHES.items():
         frozen_defs = package / version / "Defs" / "Buildings.xml"
         frozen_dll = package / version / "Assemblies" / "VoidShelf.dll"
@@ -137,6 +163,8 @@ def main() -> None:
         if hashlib.sha256(frozen_dll.read_bytes()).hexdigest() != hashes["dll"]:
             fail(f"frozen {version} VoidShelf.dll hash mismatch")
 
+    # Player-facing metadata and runtime selection must describe the same ordered
+    # versions; ordering also keeps the published metadata deterministic.
     metadata = ET.parse(about / "About.xml").getroot()
     name = metadata.findtext("name", default="").strip()
     package_id = metadata.findtext("packageId", default="").strip()
@@ -148,6 +176,8 @@ def main() -> None:
     if versions != [mapping["v1.5"], mapping["v1.6"]]:
         fail("About supportedVersions must exactly match LoadFolders.xml versions")
 
+    # A package may validly support versions other than the local installation,
+    # so this environmental mismatch is advisory rather than a package failure.
     if args.rimworld_dir:
         version = installed_version(args.rimworld_dir)
         if version:

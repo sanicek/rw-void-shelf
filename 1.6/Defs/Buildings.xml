@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Defs>
 
+	<!-- RimWorld 1.6 moved shelf behavior into StorageShelfBase. Inheriting that
+	     base preserves the game's normal storage UI and hauling behavior while
+	     the custom component adds destruction on the rare-tick schedule. -->
 	<ThingDef ParentName="StorageShelfBase">
 		<defName>VoidShelf</defName>
 		<label>Void Shelf</label>
@@ -20,6 +23,8 @@
 		<size>(2,1)</size>
 		<designationHotKey>Misc12</designationHotKey>
 		<tickerType>Rare</tickerType>
+		<!-- The class name is resolved from VoidShelf.dll and bridges this Def to
+		     CompDestroyerShelf.CompTickRare. -->
 		<comps>
 			<li Class="VoidShelf.CompProperties_DestroyerShelf"/>
 		</comps>
@@ -31,6 +36,8 @@
 			<defaultStorageSettings>
 				<priority>Low</priority>
 				<filter>
+					<!-- Start disabled so placing the shelf cannot immediately route
+					     valuable items into an irreversible sink. -->
 					<categories Inherit="False" />
 				</filter>
 			</defaultStorageSettings>

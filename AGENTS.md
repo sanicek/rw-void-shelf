@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Literate Programming
+
+- Write all maintained code in a literate programming style: present each file and nontrivial section as a top-down narrative that introduces its purpose before its implementation.
+- Keep explanations next to the code they govern. Document intent, invariants, lifecycle, compatibility constraints, failure behavior, and non-obvious tradeoffs rather than restating syntax.
+- Document public entry points and divide multi-phase scripts or validators into named conceptual phases. Prefer clear names and simple code over comments that compensate for avoidable complexity.
+- Remove dead code instead of preserving it in comments. Keep every comment accurate when behavior changes, and update related maintainer documentation when workflows, package layout, supported versions, or validation rules change.
+- Do not add narrative comments to generated files, dependency lockfiles, binaries, artwork, vendored content, or checksum-frozen recovered artifacts. Document those files in the maintained source that produces, validates, or consumes them instead.
+
 ## Git Workflow (Build Mode)
 
 - `main` is protected and must never receive direct commits or pushes. All changes go through feature branches.
