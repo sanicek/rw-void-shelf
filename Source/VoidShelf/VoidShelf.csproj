@@ -8,6 +8,15 @@
     <RootNamespace>VoidShelf</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Deterministic>true</Deterministic>
+    <!-- Release packages do not ship symbols. Omitting debug and SourceLink data
+         keeps the DLL independent of the current commit and checkout path, so an
+         accepted candidate can be reproduced after its documentation is merged. -->
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- A persistent compiler could outlive the build while retaining the
+         inherited artifact lock. In-process compilation closes it with MSBuild. -->
+    <UseSharedCompilation>false</UseSharedCompilation>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>

@@ -3,6 +3,8 @@
   <name>Void Shelf</name>
   <author>Sanicek</author>
   <packageId>Sanicek.VoidShelf</packageId>
+  <modVersion>1.0.0</modVersion>
+  <url>https://github.com/sanicek/rw-void-shelf</url>
   <!-- These versions are both player-facing compatibility metadata and a
        validated contract. Keep them ordered and synchronized with
        LoadFolders.xml and validate-package.py. -->
