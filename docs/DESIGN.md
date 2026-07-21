@@ -14,10 +14,11 @@ in [the release records](RELEASES.md).
 
 ## Versioned Runtime Model
 
-`LoadFolders.xml` selects exactly one runtime tree. RimWorld 1.5 loads recovered
-Defs and a recovered assembly. Those files are immutable and protected by
-SHA-256 checks in both the build and package validator. RimWorld 1.6 loads
-maintained Defs and an assembly compiled from `Source/VoidShelf`.
+`LoadFolders.xml` loads shared root content followed by exactly one runtime tree.
+Root content currently supplies translations. RimWorld 1.5 loads recovered Defs
+and a recovered assembly; those files are immutable and protected by SHA-256
+checks in both the build and package validator. RimWorld 1.6 loads maintained
+Defs and an assembly compiled from `Source/VoidShelf`.
 
 The 1.6 `VoidShelf` ThingDef inherits `StorageShelfBase`, retaining normal game
 storage, filters, priorities, and hauling. `CompProperties_DestroyerShelf`
@@ -25,6 +26,19 @@ attaches `CompDestroyerShelf`; each rare tick, the component snapshots the slot
 group and destroys all held things except its parent. A missing slot group is a
 valid no-op. Combat Extended motivated the item-sink use case but is not a
 dependency.
+
+## Localization Model
+
+The maintained 1.6 ThingDef is the English source for `VoidShelf.label` and
+`VoidShelf.description`. Simplified Chinese, French, German, Russian, and Spanish
+override those fields through root-level `DefInjected/ThingDef/Buildings.xml`
+catalogs. Root routing makes the same catalogs apply to both game versions while
+leaving the checksum-frozen 1.5 Def unchanged.
+
+The validator derives required keys from the active Def, requires the exact
+supported language tree, and rejects missing, duplicate, empty, or unchanged
+English values. There is no keyed catalog because the current C# strings are
+diagnostic logs rather than player-facing UI.
 
 ## Durable Contracts
 
@@ -36,6 +50,8 @@ dependency.
   and `VoidShelf.CompDestroyerShelf` are save- and XML-sensitive identities.
 - RimWorld 1.5 and 1.6 remain supported until an intentional major-version
   decision changes the support contract.
+- English and the five translated languages remain synchronized for every
+  player-facing Def field included in the localization contract.
 - The 1.5 Def and DLL remain byte-for-byte frozen at their documented hashes.
 - The shelf remains an irreversible item sink driven by rare ticks, not a hidden
   inventory, conversion recipe, or recoverable deletion queue.

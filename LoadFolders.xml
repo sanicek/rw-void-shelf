@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <loadFolders>
-  <!-- RimWorld selects exactly one versioned runtime tree. Keep these mappings
-       synchronized with About.xml and validate-package.py. -->
-  <v1.5><li>1.5</li></v1.5>
-  <v1.6><li>1.6</li></v1.6>
+  <!-- Shared root content supplies translations while RimWorld selects exactly
+       one versioned Def and assembly tree. Keep these mappings synchronized with
+       About.xml and validate-package.py. -->
+  <v1.5>
+    <li>/</li>
+    <li>1.5</li>
+  </v1.5>
+  <v1.6>
+    <li>/</li>
+    <li>1.6</li>
+  </v1.6>
 </loadFolders>

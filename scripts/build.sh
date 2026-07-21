@@ -134,6 +134,7 @@ cleanup_package() {
 trap cleanup_package EXIT
 mkdir -p -- "$package_stage/$active_version/Assemblies"
 cp -a -- "$repo_root/About" "$package_stage/"
+cp -a -- "$repo_root/Languages" "$package_stage/"
 cp -- "$repo_root/LoadFolders.xml" "$package_stage/LoadFolders.xml"
 cp -- "$repo_root/LICENSE" "$package_stage/LICENSE"
 for frozen_version in "${frozen_versions[@]}"; do

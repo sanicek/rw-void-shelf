@@ -21,8 +21,10 @@ from project import ProjectError, load_project
 # These declarations define the package as an allowlist. Unexpected content is
 # rejected so source, build intermediates, and stale version directories cannot
 # accidentally ship.
-EXPECTED_TOP_LEVEL = {"About", "LoadFolders.xml", "LICENSE", "1.5", "1.6"}
+EXPECTED_TOP_LEVEL = {"About", "Languages", "LoadFolders.xml", "LICENSE", "1.5", "1.6"}
 EXPECTED_VERSIONS = ("1.5", "1.6")
+TRANSLATED_LANGUAGES = ("ChineseSimplified", "French", "German", "Russian", "Spanish")
+LANGUAGE_CATALOG = "DefInjected/ThingDef/Buildings.xml"
 FORBIDDEN_NAMES = {"Source", ".git", "scripts", "bin", "obj", ".vs"}
 PACKAGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
 PROJECT_URL = "https://github.com/sanicek/rw-void-shelf"
@@ -72,7 +74,7 @@ def installed_version(rimworld_dir: Path) -> Optional[str]:
     return match.group(0)
 
 
-def load_folder_mapping(path: Path) -> Dict[str, str]:
+def load_folder_mapping(path: Path) -> Dict[str, tuple[str, ...]]:
     """Read the exact game-series-to-runtime-directory mapping."""
     try:
         root = ET.parse(path).getroot()
@@ -88,14 +90,16 @@ def load_folder_mapping(path: Path) -> Dict[str, str]:
         fail("LoadFolders.xml must contain exactly v1.5 and v1.6 mappings")
     mapping = {}
     for entry in entries:
-        if entry.attrib or (entry.text and entry.text.strip()) or (entry.tail and entry.tail.strip()) or len(entry) != 1:
+        if entry.attrib or (entry.text and entry.text.strip()) or (entry.tail and entry.tail.strip()) or len(entry) != 2:
             fail(f"invalid LoadFolders.xml mapping for {entry.tag}")
-        item = entry[0]
-        if item.tag != "li" or item.attrib or len(item) != 0 or item.text is None or (item.tail and item.tail.strip()):
-            fail(f"invalid LoadFolders.xml mapping for {entry.tag}")
-        mapping[entry.tag] = item.text.strip()
-    if mapping != {"v1.5": "1.5", "v1.6": "1.6"}:
-        fail("LoadFolders.xml mappings must select matching 1.5 and 1.6 folders")
+        folders = []
+        for item in entry:
+            if item.tag != "li" or item.attrib or len(item) != 0 or item.text is None or (item.tail and item.tail.strip()):
+                fail(f"invalid LoadFolders.xml mapping for {entry.tag}")
+            folders.append(item.text.strip())
+        mapping[entry.tag] = tuple(folders)
+    if mapping != {"v1.5": ("/", "1.5"), "v1.6": ("/", "1.6")}:
+        fail("LoadFolders.xml mappings must load shared root followed by the matching version folder")
     return mapping
 
 
@@ -124,6 +128,62 @@ def validate_version(package: Path, version: str) -> None:
             fail("frozen 1.5 runtime must contain exactly Buildings.xml and VoidShelf.dll")
 
 
+def language_entries(path: Path) -> Dict[str, str]:
+    """Read one flat DefInjected catalog after rejecting ambiguous entries."""
+    require_file(path)
+    root = ET.parse(path).getroot()
+    if root.tag != "LanguageData" or root.attrib:
+        fail(f"language catalog must use an unadorned LanguageData root: {path}")
+    children = list(root)
+    entries = {child.tag: child.text or "" for child in children}
+    if len(entries) != len(children):
+        fail(f"language catalog contains duplicate keys: {path}")
+    if any(child.attrib or len(child) for child in children):
+        fail(f"language catalog entries must contain text only: {path}")
+    if any(not value.strip() or value != value.strip() for value in entries.values()):
+        fail(f"language catalog entries must contain non-empty text without surrounding whitespace: {path}")
+    return entries
+
+
+def validate_languages(package: Path) -> None:
+    """Require exact translated coverage of the maintained player-facing Def fields."""
+    languages = package / "Languages"
+    require_directory(languages)
+    expected_entries = {
+        entry
+        for language in TRANSLATED_LANGUAGES
+        for entry in (
+            language,
+            f"{language}/DefInjected",
+            f"{language}/DefInjected/ThingDef",
+            f"{language}/{LANGUAGE_CATALOG}",
+        )
+    }
+    actual_entries = {path.relative_to(languages).as_posix() for path in languages.rglob("*")}
+    if actual_entries != expected_entries:
+        fail("Languages must contain exactly the five supported ThingDef translation catalogs")
+    parse_xml_files(languages)
+
+    defs = ET.parse(package / "1.6" / "Defs" / "Buildings.xml").getroot()
+    thing = next((item for item in defs.findall("ThingDef") if item.findtext("defName") == "VoidShelf"), None)
+    if thing is None:
+        fail("active Defs must contain the VoidShelf ThingDef used by translations")
+    english = {
+        "VoidShelf.label": thing.findtext("label", default="").strip(),
+        "VoidShelf.description": thing.findtext("description", default="").strip(),
+    }
+    if any(not value for value in english.values()):
+        fail("active VoidShelf Def requires an English label and description")
+    for language in TRANSLATED_LANGUAGES:
+        path = languages / language / LANGUAGE_CATALOG
+        translated = language_entries(path)
+        if set(translated) != set(english):
+            fail(f"translated ThingDef catalog does not match the English key set: {path}")
+        for key, english_text in english.items():
+            if translated[key] == english_text:
+                fail(f"translated ThingDef entry unexpectedly falls back to English: {path}: {key}")
+
+
 def main() -> None:
     """Validate package shape, payload integrity, and synchronized metadata."""
     # Keep the concise CLI description stable while the module narrative records
@@ -141,7 +201,7 @@ def main() -> None:
     if not package.is_dir():
         fail(f"package directory does not exist: {package}")
     if {path.name for path in package.iterdir()} != EXPECTED_TOP_LEVEL:
-        fail("package must contain exactly About, LoadFolders.xml, LICENSE, 1.5, and 1.6")
+        fail("package must contain exactly About, Languages, LoadFolders.xml, LICENSE, 1.5, and 1.6")
     for path in package.rglob("*"):
         if path.is_symlink():
             fail(f"symlinks are not allowed in package: {path}")
@@ -169,6 +229,7 @@ def main() -> None:
     parse_xml_files(about)
     for version in EXPECTED_VERSIONS:
         validate_version(package, version)
+    validate_languages(package)
 
     # Older recovered payloads are historical artifacts, not rebuild products.
     # Hashing both Defs and DLLs makes accidental edits fail packaging.
@@ -199,7 +260,7 @@ def main() -> None:
         fail(f"About/About.xml has an invalid packageId: {package_id!r}")
     if project.package_name != "VoidShelf" or project_url != PROJECT_URL:
         fail(f"About/About.xml must identify VoidShelf and link to {PROJECT_URL}")
-    if versions != [mapping["v1.5"], mapping["v1.6"]]:
+    if versions != [mapping["v1.5"][-1], mapping["v1.6"][-1]]:
         fail("About supportedVersions must exactly match LoadFolders.xml versions")
 
     # A package may validly support versions other than the local installation,

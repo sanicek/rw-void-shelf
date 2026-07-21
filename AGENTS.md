@@ -44,6 +44,21 @@
   and approval. Record provenance, processing, and validation when replacement
   artwork is accepted.
 
+## Localization Workflow
+
+- English ThingDef text in the maintained 1.6 Def is the localization source.
+  Do not add an English `DefInjected` copy or edit the frozen 1.5 Def.
+- Root `Languages/` content supplies `VoidShelf.label` and
+  `VoidShelf.description` to both supported game versions. Keep complete
+  ChineseSimplified, French, German, Russian, and Spanish catalogs at the exact
+  shared `DefInjected/ThingDef/Buildings.xml` path.
+- Preserve key coverage, non-empty translated values, and natural
+  game-appropriate terminology. A translation change alters package output and
+  is release-bearing.
+- If future C# code adds player-facing text, introduce a stable `VoidShelf_`
+  keyed English source catalog and matching catalogs for every supported
+  language. Diagnostic log messages do not require translation.
+
 ## Literate Programming
 
 - Write all maintained code in a literate programming style: present each file and nontrivial section as a top-down narrative that introduces its purpose before its implementation.
@@ -58,7 +73,7 @@
   workflow contract tests.
 - Run `scripts/build.sh` for maintained gameplay or package changes. It compiles
   the active 1.6 assembly, verifies the frozen 1.5 hashes, assembles the package,
-  and validates its structure.
+  and validates its structure and localization coverage.
 - Run `scripts/install-local.sh` after gameplay changes to build, validate, and
   transactionally install the current source package for development testing.
 - The user performs one representative RimWorld smoke test: build a Void Shelf,
