@@ -16,13 +16,17 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Optional
 
+from project import ProjectError, load_project
+
 # These declarations define the package as an allowlist. Unexpected content is
 # rejected so source, build intermediates, and stale version directories cannot
 # accidentally ship.
-EXPECTED_TOP_LEVEL = {"About", "LoadFolders.xml", "1.5", "1.6"}
+EXPECTED_TOP_LEVEL = {"About", "LoadFolders.xml", "LICENSE", "1.5", "1.6"}
 EXPECTED_VERSIONS = ("1.5", "1.6")
 FORBIDDEN_NAMES = {"Source", ".git", "scripts", "bin", "obj", ".vs"}
 PACKAGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+PROJECT_URL = "https://github.com/sanicek/rw-void-shelf"
+WORKSHOP_ID = "3008773339"
 FROZEN_PAYLOAD_HASHES = {
     "1.5": {
         "defs": "cbf0d16d5bc11a5f0fb2351b994d0cb7c68bfa8738aa3f85b4a2a49270c6baca",
@@ -114,6 +118,10 @@ def validate_version(package: Path, version: str) -> None:
     if any(path.stat().st_size == 0 for path in def_files):
         fail(f"empty Defs XML file found under {defs}")
     parse_xml_files(defs)
+    if version == "1.5":
+        entries = {path.relative_to(version_dir).as_posix() for path in version_dir.rglob("*")}
+        if entries != {"Defs", "Defs/Buildings.xml", "Assemblies", "Assemblies/VoidShelf.dll"}:
+            fail("frozen 1.5 runtime must contain exactly Buildings.xml and VoidShelf.dll")
 
 
 def main() -> None:
@@ -133,10 +141,12 @@ def main() -> None:
     if not package.is_dir():
         fail(f"package directory does not exist: {package}")
     if {path.name for path in package.iterdir()} != EXPECTED_TOP_LEVEL:
-        fail("package must contain exactly About, LoadFolders.xml, 1.5, and 1.6")
+        fail("package must contain exactly About, LoadFolders.xml, LICENSE, 1.5, and 1.6")
     for path in package.rglob("*"):
         if path.is_symlink():
             fail(f"symlinks are not allowed in package: {path}")
+        if not path.is_dir() and not path.is_file():
+            fail(f"special filesystem entries are not allowed in package: {path}")
         if path.name in FORBIDDEN_NAMES:
             fail(f"generated or repository artifact is not allowed in package: {path}")
 
@@ -144,9 +154,17 @@ def main() -> None:
     # payloads. The mapping is retained for the metadata consistency check.
     about = package / "About"
     require_directory(about)
+    if {path.name for path in about.iterdir()} != {"About.xml", "Preview.png", "PublishedFileId.txt"}:
+        fail("About must contain exactly About.xml, Preview.png, and PublishedFileId.txt")
     require_file(about / "About.xml")
+    require_file(about / "Preview.png")
+    published_file_id = about / "PublishedFileId.txt"
+    require_file(published_file_id)
+    if published_file_id.read_text(encoding="ascii").splitlines() != [WORKSHOP_ID]:
+        fail(f"About/PublishedFileId.txt must contain exactly the Workshop ID {WORKSHOP_ID}")
     load_folders = package / "LoadFolders.xml"
     require_file(load_folders)
+    require_file(package / "LICENSE")
     mapping = load_folder_mapping(load_folders)
     parse_xml_files(about)
     for version in EXPECTED_VERSIONS:
@@ -165,14 +183,22 @@ def main() -> None:
 
     # Player-facing metadata and runtime selection must describe the same ordered
     # versions; ordering also keeps the published metadata deterministic.
-    metadata = ET.parse(about / "About.xml").getroot()
+    metadata_path = about / "About.xml"
+    metadata = ET.parse(metadata_path).getroot()
+    try:
+        project = load_project(metadata_path)
+    except ProjectError as error:
+        fail(str(error))
     name = metadata.findtext("name", default="").strip()
     package_id = metadata.findtext("packageId", default="").strip()
+    project_url = metadata.findtext("url", default="").strip()
     versions = [element.text.strip() for element in metadata.findall("./supportedVersions/li") if element.text and element.text.strip()]
-    if not name:
-        fail("About/About.xml has an empty name")
-    if not PACKAGE_ID.fullmatch(package_id):
+    if name != "Void Shelf":
+        fail(f"About/About.xml has an unexpected name: {name!r}")
+    if package_id != "Sanicek.VoidShelf" or not PACKAGE_ID.fullmatch(package_id):
         fail(f"About/About.xml has an invalid packageId: {package_id!r}")
+    if project.package_name != "VoidShelf" or project_url != PROJECT_URL:
+        fail(f"About/About.xml must identify VoidShelf and link to {PROJECT_URL}")
     if versions != [mapping["v1.5"], mapping["v1.6"]]:
         fail("About supportedVersions must exactly match LoadFolders.xml versions")
 
