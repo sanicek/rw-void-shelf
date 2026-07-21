@@ -25,6 +25,17 @@ Void Shelf was created to remove unwanted Combat Extended ammunition clutter. Co
 
 Supports RimWorld 1.5 and 1.6.
 
+[h2]Languages[/h2]
+
+[list]
+[*]English
+[*]Simplified Chinese
+[*]French
+[*]German
+[*]Russian
+[*]Spanish
+[/list]
+
 [h2]License, source, and AI assistance[/h2]
 
 Source: [url=https://github.com/sanicek/rw-void-shelf]github.com/sanicek/rw-void-shelf[/url]
