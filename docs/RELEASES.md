@@ -38,7 +38,8 @@ Copy [`releases/EXAMPLE.md`](releases/EXAMPLE.md) to
 notes and records changes, update risks, exact build inputs, source revision,
 archive checksum, and representative smoke-test acceptance.
 
-- [1.0.0](releases/1.0.0.md) - first governed stable-release candidate
+- [1.1.0](releases/1.1.0.md) - shared translations for five additional languages
+- [1.0.0](releases/1.0.0.md) - first governed stable release
 
 `PENDING` is a publication blocker, not an acceptable value in a published
 record. Historical facts that cannot be reconstructed must instead be described

@@ -77,6 +77,7 @@ class RealPackageFixture:
         shutil.copytree(REPO_ROOT / "About", self.package / "About")
         shutil.copytree(REPO_ROOT / "1.5", self.package / "1.5")
         shutil.copytree(REPO_ROOT / "1.6", self.package / "1.6")
+        shutil.copytree(REPO_ROOT / "Languages", self.package / "Languages")
         shutil.copyfile(REPO_ROOT / "LoadFolders.xml", self.package / "LoadFolders.xml")
         shutil.copyfile(REPO_ROOT / "LICENSE", self.package / "LICENSE")
         assemblies = self.package / "1.6" / "Assemblies"
@@ -115,7 +116,11 @@ class ProjectTests(unittest.TestCase):
 
     def test_repository_metadata_has_the_release_identity(self) -> None:
         project = load_project(REPO_ROOT / "About" / "About.xml")
-        self.assertEqual((project.package_id, project.version), ("Sanicek.VoidShelf", "1.0.0"))
+        self.assertEqual((project.package_id, project.version), ("Sanicek.VoidShelf", "1.1.0"))
+        self.assertIn(
+            f"docs/releases/{project.version}.md",
+            (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
+        )
 
 
 class PackageValidatorTests(unittest.TestCase):
@@ -134,14 +139,19 @@ class PackageValidatorTests(unittest.TestCase):
 
     def test_changed_or_expanded_frozen_runtime_is_rejected(self) -> None:
         buildings = self.fixture.package / "1.5" / "Defs" / "Buildings.xml"
+        assembly = self.fixture.package / "1.5" / "Assemblies" / "VoidShelf.dll"
         original = buildings.read_bytes()
-        for mutation in ("changed", "extra", "empty-directory"):
+        original_assembly = assembly.read_bytes()
+        for mutation in ("changed-def", "changed-dll", "extra", "empty-directory"):
             with self.subTest(mutation=mutation):
                 buildings.write_bytes(original)
+                assembly.write_bytes(original_assembly)
                 extra = buildings.with_name("Injected.xml")
                 extra.unlink(missing_ok=True)
-                if mutation == "changed":
+                if mutation == "changed-def":
                     buildings.write_bytes(original + b"\n")
+                elif mutation == "changed-dll":
+                    assembly.write_bytes(original_assembly + b"\x00")
                 elif mutation == "extra":
                     extra.write_text("<Defs />\n", encoding="utf-8")
                 else:
@@ -150,6 +160,7 @@ class PackageValidatorTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 shutil.rmtree(buildings.parent / "Empty", ignore_errors=True)
         buildings.write_bytes(original)
+        assembly.write_bytes(original_assembly)
 
     def test_identity_and_filesystem_violations_are_rejected(self) -> None:
         cases = ("workshop", "url", "symlink", "fifo")
@@ -165,6 +176,78 @@ class PackageValidatorTests(unittest.TestCase):
                     (fixture.package / "1.6" / "Defs" / "Link.xml").symlink_to("Buildings.xml")
                 else:
                     os.mkfifo(fixture.package / "1.6" / "Defs" / "pipe")
+                self.assertNotEqual(fixture.validate().returncode, 0)
+
+    def test_translation_coverage_and_shared_routing_are_required(self) -> None:
+        for case in ("missing-catalog", "wrong-key", "english-fallback", "missing-root-route"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                fixture = RealPackageFixture(Path(temporary))
+                catalog = fixture.package / "Languages" / "French" / "DefInjected" / "ThingDef" / "Buildings.xml"
+                if case == "missing-catalog":
+                    catalog.unlink()
+                elif case == "wrong-key":
+                    catalog.write_text(
+                        catalog.read_text(encoding="utf-8").replace("VoidShelf.description", "VoidShelf.wrong"),
+                        encoding="utf-8",
+                    )
+                elif case == "english-fallback":
+                    catalog.write_text(
+                        catalog.read_text(encoding="utf-8").replace("étagère du néant", "Void Shelf"),
+                        encoding="utf-8",
+                    )
+                else:
+                    load_folders = fixture.package / "LoadFolders.xml"
+                    load_folders.write_text(
+                        load_folders.read_text(encoding="utf-8").replace("    <li>/</li>\n", ""),
+                        encoding="utf-8",
+                    )
+                self.assertNotEqual(fixture.validate().returncode, 0)
+
+    def test_ambiguous_or_expanded_translation_catalogs_are_rejected(self) -> None:
+        cases = ("duplicate", "blank", "nested", "extra-catalog", "extra-language")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                fixture = RealPackageFixture(Path(temporary))
+                french = fixture.package / "Languages" / "French"
+                catalog = french / "DefInjected" / "ThingDef" / "Buildings.xml"
+                text = catalog.read_text(encoding="utf-8")
+                if case == "duplicate":
+                    catalog.write_text(
+                        text.replace("</LanguageData>", "  <VoidShelf.label>duplicata</VoidShelf.label>\n</LanguageData>"),
+                        encoding="utf-8",
+                    )
+                elif case == "blank":
+                    catalog.write_text(
+                        text.replace("étagère du néant", "   ", 1),
+                        encoding="utf-8",
+                    )
+                elif case == "nested":
+                    catalog.write_text(
+                        text.replace("étagère du néant", "<b>étagère du néant</b>", 1),
+                        encoding="utf-8",
+                    )
+                elif case == "extra-catalog":
+                    (catalog.parent / "Other.xml").write_text("<LanguageData />\n", encoding="utf-8")
+                else:
+                    shutil.copytree(french, fixture.package / "Languages" / "Italian")
+                self.assertNotEqual(fixture.validate().returncode, 0)
+
+    def test_root_runtime_content_and_cross_version_routes_are_rejected(self) -> None:
+        for case in ("root-defs", "root-assemblies", "wrong-version", "both-versions"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                fixture = RealPackageFixture(Path(temporary))
+                if case == "root-defs":
+                    (fixture.package / "Defs").mkdir()
+                elif case == "root-assemblies":
+                    (fixture.package / "Assemblies").mkdir()
+                else:
+                    load_folders = fixture.package / "LoadFolders.xml"
+                    text = load_folders.read_text(encoding="utf-8")
+                    if case == "wrong-version":
+                        text = text.replace("    <li>1.5</li>", "    <li>1.6</li>", 1)
+                    else:
+                        text = text.replace("    <li>1.5</li>", "    <li>1.5</li>\n    <li>1.6</li>", 1)
+                    load_folders.write_text(text, encoding="utf-8")
                 self.assertNotEqual(fixture.validate().returncode, 0)
 
 
@@ -422,7 +505,7 @@ class SourceContractTests(unittest.TestCase):
             subprocess.run(["git", "add", "."], cwd=repo, check=True)
             source_validator.validate_source(repo, release=True)
 
-            (repo / "docs" / "releases" / "1.0.0.md").unlink()
+            (repo / "docs" / "releases" / "1.1.0.md").unlink()
             with self.assertRaisesRegex(source_validator.SourceError, "release record is required"):
                 source_validator.validate_source(repo, release=True)
 

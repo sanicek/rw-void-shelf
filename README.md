@@ -14,7 +14,7 @@ it in the mod manager. GitHub-generated source archives are repository snapshots
 not installable mods.
 
 The current governed candidate is documented in
-[`docs/releases/1.0.0.md`](docs/releases/1.0.0.md); use only a published archive
+[`docs/releases/1.1.0.md`](docs/releases/1.1.0.md); use only a published archive
 whose candidate record contains its checksum and acceptance evidence.
 
 ## Recovery Status
@@ -52,6 +52,9 @@ The resulting runtime-only package is written to `artifacts/VoidShelf/`:
 
 ```text
 About/
+Languages/
+  ChineseSimplified, French, German, Russian, Spanish/
+    DefInjected/ThingDef/Buildings.xml
 LoadFolders.xml
 1.5/
   Defs/
@@ -62,13 +65,26 @@ LoadFolders.xml
 LICENSE
 ```
 
-`LoadFolders.xml` selects the matching `1.5/` or `1.6/` folder at runtime. The
-1.5 Def and DLL are immutable recovered shipped artifacts, checksum-protected as
+`LoadFolders.xml` loads shared root translations and selects the matching `1.5/`
+or `1.6/` runtime folder. The 1.5 Def and DLL are immutable recovered shipped
+artifacts, checksum-protected as
 `cbf0d16d5bc11a5f0fb2351b994d0cb7c68bfa8738aa3f85b4a2a49270c6baca` and
 `67b0c3c907b46e05913be541dd04cee488fc8c7ddbb6ed5877d92c01e71b6f20`.
 Current source builds the active 1.6 DLL only; 1.5 was not newly rebuilt or
 retested. The build validates package structure, XML, LoadFolders mappings, and
 frozen payload hashes.
+
+## Translations
+
+Void Shelf supports English, Simplified Chinese, French, German, Russian, and
+Spanish. English labels and descriptions remain in the maintained 1.6 Def; the
+five translated `DefInjected` catalogs live under root `Languages/` so the same
+keys apply to both RimWorld 1.5 and 1.6 without modifying the recovered payload.
+
+The package validator requires every translated catalog to contain exactly
+`VoidShelf.label` and `VoidShelf.description`, rejects empty values and English
+fallbacks, and keeps the supported language set and paths exact. Diagnostic C#
+log messages are intentionally not player-facing localization keys.
 
 ## Tests And Validation
 
@@ -78,9 +94,10 @@ Run host-independent tooling tests with:
 ./scripts/test.sh
 ```
 
-These tests cover metadata and source contracts, deterministic archive bytes,
-same-version candidate immutability, clean-worktree release gates, and rejection
-of unsafe archive forms. They do not require RimWorld, .NET, or a network.
+These tests cover metadata, source and localization contracts, deterministic
+archive bytes, same-version candidate immutability, clean-worktree release gates,
+and rejection of unsafe archive forms. They do not require RimWorld, .NET, or a
+network.
 
 `./scripts/build.sh` is the integration check: it restores with the lock file,
 compiles the active 1.6 assembly with warnings as errors, checks both frozen 1.5
@@ -171,6 +188,7 @@ into a comment.
 - `About/` — mod metadata, Workshop item ID, and preview image
 - `1.5/` — immutable recovered 1.5 runtime Defs and DLL
 - `1.6/` — active 1.6 Defs; its DLL is generated only in packages
+- `Languages/` — shared translated ThingDef labels and descriptions
 - `Source/VoidShelf/` — Visual Studio solution, project, and C# source
 - `scripts/` — build, package validation, and local-install helpers
 - `docs/` — durable design decisions and release governance

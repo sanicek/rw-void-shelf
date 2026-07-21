@@ -25,7 +25,7 @@ FROZEN_PAYLOAD_HASHES = {
         "Assemblies/VoidShelf.dll": "67b0c3c907b46e05913be541dd04cee488fc8c7ddbb6ed5877d92c01e71b6f20",
     }
 }
-PACKAGE_INPUTS = ("About", "LoadFolders.xml", "LICENSE", *EXPECTED_VERSIONS)
+PACKAGE_INPUTS = ("About", "Languages", "LoadFolders.xml", "LICENSE", *EXPECTED_VERSIONS)
 
 
 class SourceError(ValueError):
